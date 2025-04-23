@@ -6,7 +6,7 @@ from adafruit_extended_bus import ExtendedI2C as I2C
 import adafruit_bno08x
 from adafruit_bno08x.i2c import BNO08X_I2C
 import traceback
-
+import board
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Imu
@@ -41,7 +41,8 @@ class BNO085_Publisher(Node):
         self.read_send_timer = self.create_timer(0.25, self.read_and_send_imu_data)
 
     def init_sensor(self):
-        i2c = I2C(3)
+        i2c = board.I2C()
+        #i2c = board.STEMMA_I2C()
         try:
             self.imu = BNO08X_I2C(i2c)
         except:
