@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'bno085_publisher = bno085.BNO085_pub:main',
+            'amrj16_imu_exe = bno085.BNO085_I2C_adapter:main',
         ],
     },
 )
