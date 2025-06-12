@@ -24,7 +24,7 @@ class BNO085_Publisher(Node):
         super().__init__('BNO085_Publisher')
         # create the publisher for the IMU data
         self.imu_data_publisher = self.create_publisher(
-            Imu, # ROS Message
+            Imu, # ROS Messages
             'IMU_Data',  # Topic
             10)
         # create the publisher for the Robots Orientation data
