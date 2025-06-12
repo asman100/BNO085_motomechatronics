@@ -22,67 +22,40 @@ gyro = [0,0,0] # x, y, z  (in deg/s)
 class BNO085_Publisher(Node):
     def __init__(self):
         super().__init__('BNO085_Publisher')
+        # create the publisher for the IMU data
         self.imu_data_publisher = self.create_publisher(
-            Imu,
-            'IMU_Data',
+            Imu, # ROS Message
+            'IMU_Data',  # Topic
             10)
+        # create the publisher for the Robots Orientation data
         self.robot_orientation_publisher  = self.create_publisher(
-            Vector3,
-            'Robot_Euler_Orientation',
+            Vector3, # ROS Message
+            'Robot_Euler_Orientation', # Topic
             10)
-
+        
+        # IMU sensor (BNO085)
         self.imu = None
-        self.target_frequency = 40.0  # Hz  <--- DEFINE TARGET FREQUENCY
         self.init_sensor()
 
-        # create timer for reading and publishing data
-        timer_period = 1.0 / self.target_frequency # seconds
-        self.get_logger().info(f"Setting ROS2 timer to {timer_period:.4f}s ({self.target_frequency} Hz)")
-        self.read_send_timer = self.create_timer(timer_period, self.read_and_send_imu_data)
+        # create timer for reading and publishing data (@ rate of ~4hz)
+        self.read_send_timer = self.create_timer(0.02, self.read_and_send_imu_data)
 
     def init_sensor(self):
+        i2c = board.I2C()
+        #i2c = board.STEMMA_I2C()
         try:
-            # Explicitly set I2C frequency to 400kHz
-            # For MCP2221A with Adafruit Blinka, board.I2C() can take a frequency argument
-            self.get_logger().info("Attempting to initialize I2C with 400kHz frequency.")
-            i2c = board.I2C(frequency=400000)
-            # If the above board.I2C(frequency=...) doesn't work directly with your Blinka setup for MCP2221A,
-            # you might need to use busio explicitly:
-            # i2c = busio.I2C(board.SCL, board.SDA, frequency=400000)
-            self.get_logger().info("I2C bus initialized.")
-        except Exception as e:
-            self.get_logger().error(f"Failed to initialize I2C bus: {e}")
-            self.get_logger().error(traceback.format_exc())
-            raise
-
-        try:
-            self.get_logger().info("Attempting to connect to BNO085 via I2C...")
             self.imu = BNO08X_I2C(i2c)
-            self.get_logger().info("Successfully connected to BNO085.")
-        except Exception as e:
-            self.get_logger().error(f"Failed to connect to BNO085 via I2C: {e}")
-            self.get_logger().error(traceback.format_exc())
-            raise Exception('Failed to connect to BNO085 via I2C')
+        except:
+            self.get_logger().error('Failed to connect to BNO085 via I2C...')
+            raise Exception('Failed to connect to BNO085 via I2')
+            
 
-        # Calculate report interval in microseconds
-        report_interval_us = int((1.0 / self.target_frequency) * 1000000)
-        self.get_logger().info(f"Setting BNO08x report interval to {report_interval_us} us.")
+        # enable the reports from the IMU
+        self.imu.enable_feature(adafruit_bno08x.BNO_REPORT_ROTATION_VECTOR) # For orientation_quat and Euler (heading) data
+        self.imu.enable_feature(adafruit_bno08x.BNO_REPORT_LINEAR_ACCELERATION) # Linear acceleration data
+        self.imu.enable_feature(adafruit_bno08x.BNO_REPORT_GYROSCOPE) # For Angular Velocity data
 
-        try:
-            self.imu.enable_feature(adafruit_bno08x.BNO_REPORT_ROTATION_VECTOR, report_interval_us=report_interval_us)
-            self.imu.enable_feature(adafruit_bno08x.BNO_REPORT_LINEAR_ACCELERATION, report_interval_us=report_interval_us)
-            self.imu.enable_feature(adafruit_bno08x.BNO_REPORT_GYROSCOPE, report_interval_us=report_interval_us) # Use calibrated if available
-
-            self.get_logger().info("BNO08x features enabled with desired report interval.")
-        except Exception as e:
-            self.get_logger().error(f"Error enabling BNO08x features: {e}")
-            self.get_logger().error(traceback.format_exc())
-            # It's possible the chip is in a weird state, try a hardware reset if issues persist after code changes
-            # self.imu.hard_reset() # Be cautious with hard_reset, may require re-init
-            raise
-
-        time.sleep(0.5) # Allow time for features to stabilize
-        self.get_logger().info("IMU Initialized.")
+        time.sleep(0.5) # Make sure we the IMU is initialized
 
     def read_and_send_imu_data(self):
         # get the Angular Velocity (gryo data) of the robot
